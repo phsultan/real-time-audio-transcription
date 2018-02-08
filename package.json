@@ -1,0 +1,26 @@
+{
+  "name": "real-time-audio-transcription",
+  "version": "1.0.0",
+  "description": "Read wav audio files and get their audio chunks transcribed by Google Speech API in real time.",
+  "main": "readAndTranscribe.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phsultan/real-time-audio-transcription.git"
+  },
+  "keywords": [
+    "audio",
+    "transcription",
+    "google",
+    "real",
+    "time"
+  ],
+  "author": "Philippe SULTAN",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/phsultan/real-time-audio-transcription/issues"
+  },
+  "homepage": "https://github.com/phsultan/real-time-audio-transcription#readme"
+}
