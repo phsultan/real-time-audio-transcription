@@ -22,5 +22,9 @@
   "bugs": {
     "url": "https://github.com/phsultan/real-time-audio-transcription/issues"
   },
-  "homepage": "https://github.com/phsultan/real-time-audio-transcription#readme"
+  "homepage": "https://github.com/phsultan/real-time-audio-transcription#readme",
+  "dependencies": {
+    "@google-cloud/speech": "^1.0.1",
+    "minimist": "^1.2.0"
+  }
 }
