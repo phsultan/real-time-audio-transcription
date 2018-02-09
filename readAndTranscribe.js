@@ -150,8 +150,8 @@ if (duration < 10 || duration > 60) {
 
 const chunkSize = duration * channels * sampleRateHertz * (bitsPerSample / 8);
 const audioBuffer = Buffer.alloc(chunkSize);
-let audioBufferChannel1 = null; // used in case we have two channels
-let audioBufferChannel2 = null; // used in case we have two channels
+let audioBufferChannel1 = {}; // used in case we have two channels
+let audioBufferChannel2 = {}; // used in case we have two channels
 
 if (channels > 1) {
   audioBufferChannel1 = Buffer.alloc(chunkSize / channels);
