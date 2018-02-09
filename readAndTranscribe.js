@@ -197,7 +197,7 @@ const interval = setInterval(() => {
     clearInterval(interval);
     for (let i = 0; i < transcriptionForChannels.length; i += 1) {
       for (let j = 0; j < channels; j += 1) {
-        console.log(`[${transcriptionForChannels[i].timestamp} CHANNEL ${j}] : ${transcriptionForChannels[i].channels[j]}`); 
+        console.log(`[${transcriptionForChannels[i].timestamp} CHANNEL ${j}] : ${transcriptionForChannels[i].channels[j]}`);
       }
     }
     return;
@@ -269,14 +269,14 @@ const interval = setInterval(() => {
             .map(result => result.alternatives[0].transcript)
             .join('\n');
           transcriptionForChannels[index].channels[0] = transcription0;
-          console.log(`[${transcriptionForChannels[index].timestamp} CHANNEL 0] : ${transcriptionForChannels[index].channels[0]}`); 
+          console.log(`[${transcriptionForChannels[index].timestamp} CHANNEL 0] : ${transcriptionForChannels[index].channels[0]}`);
 
           const response1 = arrayData[1][0];
           const transcription1 = response1.results
             .map(result => result.alternatives[0].transcript)
             .join('\n');
           transcriptionForChannels[index].channels[1] = transcription1;
-          console.log(`[${transcriptionForChannels[index].timestamp} CHANNEL 1] : ${transcriptionForChannels[index].channels[1]}`); 
+          console.log(`[${transcriptionForChannels[index].timestamp} CHANNEL 1] : ${transcriptionForChannels[index].channels[1]}`);
         })
         .catch((err) => {
           console.error('ERROR:', err);
