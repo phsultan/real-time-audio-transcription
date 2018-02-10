@@ -150,12 +150,10 @@ if (duration < 10 || duration > 60) {
 
 const chunkSize = duration * channels * sampleRateHertz * (bitsPerSample / 8);
 const audioBuffer = Buffer.alloc(chunkSize);
-let audioBufferChannel1 = {}; // used in case we have two channels
-let audioBufferChannel2 = {}; // used in case we have two channels
 
-if (channels > 1) {
-  audioBufferChannel1 = Buffer.alloc(chunkSize / channels);
-  audioBufferChannel2 = Buffer.alloc(chunkSize / channels);
+let audioBufferChannelsArray = [];
+for (let i = 0; i < channels; i += 1) {
+  audioBufferChannelsArray[i] = Buffer.alloc(chunkSize / channels);
 }
 
 let totalAudioBytesRead = 0;
@@ -207,15 +205,16 @@ const interval = setInterval(() => {
   const timestampSec = totalAudioBytesRead / (2 * sampleRateHertz * channels);
   const timestamp = formatTime(timestampSec);
 
-  if (channels === 2) {
-    for (let i = 0; i < chunkSize; i += channels * (bitsPerSample / 8)) {
-      audioBuffer.copy(audioBufferChannel1, i / 2, i, i + 2);
-      audioBuffer.copy(audioBufferChannel2, i / 2, i + 2, i + 4);
+  // Copy audio buffers for every channel
+  for (let i = 0; i < chunkSize; i += channels * (bitsPerSample / 8)) {
+    for (let j = 0; j < channels; j += 1) {
+      audioBuffer.copy(audioBufferChannelsArray[j], i / channels, i + (j * channels), i + (j * channels) + (bitsPerSample / 8));
     }
+  }
 
-    debug && console.log('audioBuffer : ', audioBuffer);
-    debug && console.log('audioBufferChannel1 : ', audioBufferChannel1);
-    debug && console.log('audioBufferChannel2 : ', audioBufferChannel2);
+  debug && console.log('audioBuffer : ', audioBuffer);
+  for (let i = 0; i < channels; i += 1) {
+    debug && console.log(`audioBufferChannels[${i}] : `, audioBufferChannelsArray[i]);
   }
 
   debug && console.log('Cursor is at ', timestamp, 'sec');
@@ -225,77 +224,37 @@ const interval = setInterval(() => {
   transcriptionForChannels[intervalCounter].timestamp = timestamp;
   transcriptionForChannels[intervalCounter].channels = new Array(channels);
 
-  const request = {
-    audio: {
-      content: audioBuffer.toString('base64'),
-    },
-    config: {
-      encoding,
-      sampleRateHertz,
-      languageCode,
-    },
-  };
+  const requestForChannelArray = [];
+  for (let i = 0; i < channels; i += 1) {
+    requestForChannelArray[i] = {
+      audio: {
+        content: audioBufferChannelsArray[i].toString('base64'),
+      },
+      config: {
+        encoding,
+        sampleRateHertz,
+        languageCode,
+      }
+    }
+  }
 
-  const requestForChannel1 = {
-    audio: {
-      content: audioBufferChannel1.toString('base64'),
-    },
-    config: {
-      encoding,
-      sampleRateHertz,
-      languageCode,
-    },
-  };
-
-  const requestForChannel2 = {
-    audio: {
-      content: audioBufferChannel2.toString('base64'),
-    },
-    config: {
-      encoding,
-      sampleRateHertz,
-      languageCode,
-    },
-  };
-
-
-  if (channels > 1) {
-    ((index) => {
-      Promise
-        .all([client.recognize(requestForChannel1), client.recognize(requestForChannel2)])
-        .then((arrayData) => {
-          const response0 = arrayData[0][0];
-          const transcription0 = response0.results
+  ((index) => {
+    Promise
+      .all(requestForChannelArray.map((request) => { return client.recognize(request); }))
+      .then((arrayData) => {
+        for (let i = 0; i < channels; i += 1) {
+          const response = arrayData[i][0];
+          const transcription = response.results
             .map(result => result.alternatives[0].transcript)
             .join('\n');
-          transcriptionForChannels[index].channels[0] = transcription0;
-          console.log(`[${transcriptionForChannels[index].timestamp} CHANNEL 0] : ${transcriptionForChannels[index].channels[0]}`);
-
-          const response1 = arrayData[1][0];
-          const transcription1 = response1.results
-            .map(result => result.alternatives[0].transcript)
-            .join('\n');
-          transcriptionForChannels[index].channels[1] = transcription1;
-          console.log(`[${transcriptionForChannels[index].timestamp} CHANNEL 1] : ${transcriptionForChannels[index].channels[1]}`);
-        })
-        .catch((err) => {
-          console.error('ERROR:', err);
-        });
-    })(intervalCounter);
-  } else {
-    client
-      .recognize(request)
-      .then((data) => {
-        const response = data[0];
-        const transcription = response.results
-          .map(result => result.alternatives[0].transcript)
-          .join('\n');
-        console.log(`[${timestamp}] ${transcription}`);
+          transcriptionForChannels[index].channels[i] = transcription;
+          console.log(`[${transcriptionForChannels[index].timestamp} CHANNEL ${i}] : ${transcriptionForChannels[index].channels[i]}`);
+        }
       })
       .catch((err) => {
         console.error('ERROR:', err);
       });
-  }
+  })(intervalCounter);
 
   intervalCounter += 1;
 }, 2000);
