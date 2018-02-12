@@ -4,15 +4,30 @@ Read wav audio files and get their audio chunks transcribed by Google Speech API
 This program takes an audio file as an input and uses Google Speech API to output a text transcription.
 
 # Requirements
-* Node.js
-* A Google Speech API enabled project
+## Node.js
+
+version 5 and above should work
+
+## A Google Speech API enabled project
+
+The `GOOGLE_APPLICATION_CREDENTIALS` must be properly set and point to a
+valid service account file.
+
+If you need to get service account, you need to :
+  - Create or select a project
+  - Enable the Cloud Speech API for that project
+  - Create a service account
+  - Download a private key as JSON
+
+And then et the environment variable GOOGLE_APPLICATION_CREDENTIALS to the
+file path of the JSON file that contains your service account key.
+More info here : https://cloud.google.com/nodejs/
 
 # Usage
 ```
-Usage: node readAndTranscribe.js [options] filename projectId
+Usage: node ${basename(process.argv[1])} [options] filename
 
   finename                   Audio file to transcribe, a WAV container
-  projectId                  Your Google Cloud Platform project ID
 
 Options:
   -l, --lang                 Transcription language code, e.g. : en-US, fr-FR.
