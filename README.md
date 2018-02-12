@@ -19,13 +19,13 @@ If you need to get service account, you need to :
   - Create a service account
   - Download a private key as JSON
 
-And then et the environment variable GOOGLE_APPLICATION_CREDENTIALS to the
+And then set the environment variable GOOGLE_APPLICATION_CREDENTIALS to the
 file path of the JSON file that contains your service account key.
 More info here : https://cloud.google.com/nodejs/
 
 # Usage
 ```
-Usage: node ${basename(process.argv[1])} [options] filename
+Usage: node readAndTranscribe.js [options] filename
 
   finename                   Audio file to transcribe, a WAV container
 
