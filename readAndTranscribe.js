@@ -26,9 +26,10 @@ function closeAudioFileAndExit() {
 
 function printHelpAndExit() {
   console.log(`
-Usage: node ${basename(process.argv[1])} [options] filename
+Usage: node ${basename(process.argv[1])} [options] [filename]
 
-  finename                   Audio file to transcribe, a WAV container
+  finename                   Audio file to transcribe, a WAV container. If not
+                             present, audio is read from standard input.
 
 Options:
   -l, --lang                 Transcription language code, e.g. : en-US, fr-FR.
@@ -61,12 +62,16 @@ if (argv.h || argv.help) {
   printHelpAndExit();
 }
 
-if (argv._.length !== 1) {
+if (argv._.length === 0) {
+  console.log('Reading from STDIN');
+}
+
+if (argv._.length !== 1 && argv._.length !== 0) {
   console.log('Error: Invalid arguments');
   printHelpAndExit();
 }
 
-if (fs.existsSync(argv._[0]) === false) {
+if (argv._.length !== 0 && fs.existsSync(argv._[0]) === false) {
   console.log(`Error: file ${argv._[0]} does not exist`);
   printHelpAndExit();
 }
@@ -84,7 +89,14 @@ if (!fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
 // The name of the audio file to transcribe
 const fileName = argv._[0];
 
-fd = fs.openSync(fileName, 'r');
+console.log('process.stdin :', process.stdin);
+
+if (argv._.length !== 0) {
+  fd = fs.openSync(fileName, 'r');
+} else {
+  fd = process.stdin.fd;
+}
+
 const header = Buffer.alloc(44);
 
 const languageCode = argv.l || argv.lang || 'en-US';

@@ -25,9 +25,10 @@ More info here : https://cloud.google.com/nodejs/
 
 # Usage
 ```
-Usage: node ${basename(process.argv[1])} [options] filename
+Usage: node ${basename(process.argv[1])} [options] [filename]
 
-  finename                   Audio file to transcribe, a WAV container
+  finename                   Audio file to transcribe, a WAV container. If not
+                             present, audio is read from standard input.
 
 Options:
   -l, --lang                 Transcription language code, e.g. : en-US, fr-FR.
