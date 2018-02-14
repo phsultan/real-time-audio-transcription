@@ -89,8 +89,6 @@ if (!fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
 // The name of the audio file to transcribe
 const fileName = argv._[0];
 
-console.log('process.stdin :', process.stdin);
-
 if (argv._.length !== 0) {
   fd = fs.openSync(fileName, 'r');
 } else {
