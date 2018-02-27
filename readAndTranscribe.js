@@ -161,7 +161,7 @@ if (duration < 2 || duration > 60) {
 const chunkSize = duration * channels * sampleRateHertz * (bitsPerSample / 8);
 const audioBuffer = Buffer.alloc(chunkSize);
 
-let audioBufferChannelsArray = [];
+const audioBufferChannelsArray = [];
 for (let i = 0; i < channels; i += 1) {
   audioBufferChannelsArray[i] = Buffer.alloc(chunkSize / channels);
 }
@@ -215,7 +215,12 @@ let timerId = setTimeout(function tick() {
   // Copy audio buffers for every channel
   for (let i = 0; i < chunkSize; i += channels * (bitsPerSample / 8)) {
     for (let j = 0; j < channels; j += 1) {
-      audioBuffer.copy(audioBufferChannelsArray[j], i / channels, i + (j * channels), i + (j * channels) + (bitsPerSample / 8));
+      audioBuffer.copy(
+        audioBufferChannelsArray[j],
+        i / channels,
+        i + (j * channels),
+        i + (j * channels) + (bitsPerSample / 8),
+      );
     }
   }
 
@@ -241,13 +246,13 @@ let timerId = setTimeout(function tick() {
         encoding,
         sampleRateHertz,
         languageCode,
-      }
-    }
+      },
+    };
   }
 
   ((index) => {
     Promise
-      .all(requestForChannelArray.map((request) => { return client.recognize(request); }))
+      .all(requestForChannelArray.map(request => client.recognize(request)))
       .then((arrayData) => {
         for (let i = 0; i < channels; i += 1) {
           const response = arrayData[i][0];
