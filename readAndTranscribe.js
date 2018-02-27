@@ -92,7 +92,7 @@ const fileName = argv._[0];
 if (argv._.length !== 0) {
   fd = fs.openSync(fileName, 'r');
 } else {
-  fd = process.stdin.fd;
+  fd = fs.openSync('/dev/stdin', 'rs');
 }
 
 const header = Buffer.alloc(44);
@@ -152,7 +152,7 @@ const encoding = `LINEAR${bitsPerSample}`;
 console.log('Encoding : ', encoding);
 
 const duration = argv.c || argv.chunkduration || 10;
-if (duration < 10 || duration > 60) {
+if (duration < 2 || duration > 60) {
   console.log('Error: Invalid audio chunk duration');
   fs.closeSync(fd);
   printHelpAndExit();
@@ -177,10 +177,10 @@ const client = new speech.SpeechClient();
 const transcriptionForChannels = [];
 let intervalCounter = 0;
 
-const interval = setInterval(() => {
+let timerId = setTimeout(function tick() {
   let audioBytesRead = 0;
 
-  if (relativeAudioBytesRead > 0 && relativeAudioBytesRead < chunkSize) {
+  if (relativeAudioBytesRead < chunkSize) {
     // Need more data
     debug && console.log('Buffer is not full, still filling it');
     audioBytesRead = fs.readSync(
@@ -189,28 +189,25 @@ const interval = setInterval(() => {
       relativeAudioBytesRead,
       chunkSize - relativeAudioBytesRead,
     );
+    debug && console.log(`Read ${audioBytesRead} bytes of data`);
+
+    if (audioBytesRead < 1) {
+      debug && console.log('End of file reached, clearing timeout and leaving');
+      clearTimeout(timerId);
+      return;
+    }
+
+    relativeAudioBytesRead += audioBytesRead;
+    totalAudioBytesRead += audioBytesRead;
+    timerId = setTimeout(tick, 50);
+    return;
   } else if (relativeAudioBytesRead >= chunkSize) {
     debug && console.log('Buffer is full, starting with new data');
     relativeAudioBytesRead = 0;
     audioBytesRead = fs.readSync(fd, audioBuffer, 0, chunkSize);
-  } else if (relativeAudioBytesRead === 0) {
-    debug && console.log('New buffer');
-    audioBytesRead = fs.readSync(fd, audioBuffer, 0, chunkSize);
   }
 
   relativeAudioBytesRead += audioBytesRead;
-
-  if (audioBytesRead === 0) {
-    debug && console.log('End of file readched, exiting soon...');
-    clearInterval(interval);
-    for (let i = 0; i < transcriptionForChannels.length; i += 1) {
-      for (let j = 0; j < channels; j += 1) {
-        console.log(`[${transcriptionForChannels[i].timestamp} CHANNEL ${j}] : ${transcriptionForChannels[i].channels[j]}`);
-      }
-    }
-    return;
-  }
-
   totalAudioBytesRead += audioBytesRead;
   const timestampSec = totalAudioBytesRead / (2 * sampleRateHertz * channels);
   const timestamp = formatTime(timestampSec);
@@ -267,5 +264,6 @@ const interval = setInterval(() => {
   })(intervalCounter);
 
   intervalCounter += 1;
-}, 2000);
 
+  timerId = setTimeout(tick, 2000);
+}, 2000);
