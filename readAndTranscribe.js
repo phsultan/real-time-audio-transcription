@@ -158,6 +158,7 @@ if (duration < 2 || duration > 60) {
   printHelpAndExit();
 }
 
+const sampleSize = bitsPerSample / 8;
 const chunkSize = duration * channels * sampleRateHertz * (bitsPerSample / 8);
 const audioBuffer = Buffer.alloc(chunkSize);
 
@@ -169,7 +170,7 @@ for (let i = 0; i < channels; i += 1) {
 let totalAudioBytesRead = 0;
 let relativeAudioBytesRead = 0;
 
-console.log('chunk size :', chunkSize, 'bits, chunk duration :', duration, 'seconds');
+console.log('chunk size :', chunkSize, 'bytes, chunk duration :', duration, 'seconds');
 
 // Creates a client
 const client = new speech.SpeechClient();
@@ -219,7 +220,7 @@ let timerId = setTimeout(function tick() {
 
   relativeAudioBytesRead += audioBytesRead;
   totalAudioBytesRead += audioBytesRead;
-  const timestampSec = totalAudioBytesRead / (2 * sampleRateHertz * channels);
+  const timestampSec = totalAudioBytesRead / (sampleSize * channels * sampleRateHertz);
   const timestamp = formatTime(timestampSec);
 
   // Copy audio buffers for every channel
@@ -240,7 +241,7 @@ let timerId = setTimeout(function tick() {
   }
 
   debug && console.log('Cursor is at ', timestamp, 'sec');
-  debug && console.log('Read', audioBytesRead / (channels * sampleRateHertz), 'seconds length of data');
+  debug && console.log('Read', audioBytesRead / (sampleSize * channels * sampleRateHertz), 'seconds length of data');
 
   transcriptionForChannels[intervalCounter] = {};
   transcriptionForChannels[intervalCounter].timestamp = timestamp;
