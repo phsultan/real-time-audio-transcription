@@ -198,8 +198,8 @@ let timerId = setTimeout(function tick() {
 
       if (emptyRead > 4) {
         console.log('Read 0 bytes for too long, clearing timeout and leaving');
-	clearTimeout(timerId);
-	return;
+        clearTimeout(timerId);
+        return;
       }
 
       debug && console.log('Read 0 bytes, still getting more data if any...');
