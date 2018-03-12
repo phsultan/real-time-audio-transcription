@@ -176,6 +176,7 @@ const client = new speech.SpeechClient();
 
 const transcriptionForChannels = [];
 let intervalCounter = 0;
+let emptyRead = 0;
 
 let timerId = setTimeout(function tick() {
   let audioBytesRead = 0;
@@ -192,11 +193,20 @@ let timerId = setTimeout(function tick() {
     debug && console.log(`Read ${audioBytesRead} bytes of data`);
 
     if (audioBytesRead < 1) {
-      debug && console.log('End of file reached, clearing timeout and leaving');
-      clearTimeout(timerId);
+      emptyRead += 1;
+
+      if (emptyRead > 4) {
+        console.log('Read 0 bytes for too long, clearing timeout and leaving');
+	clearTimeout(timerId);
+	return;
+      }
+
+      debug && console.log('Read 0 bytes, still getting more data if any...');
+      timerId = setTimeout(tick, 2000);
       return;
     }
 
+    emptyRead = 0;
     relativeAudioBytesRead += audioBytesRead;
     totalAudioBytesRead += audioBytesRead;
     timerId = setTimeout(tick, 50);
@@ -262,6 +272,7 @@ let timerId = setTimeout(function tick() {
           transcriptionForChannels[index].channels[i] = transcription;
           console.log(`[${transcriptionForChannels[index].timestamp} CHANNEL ${i}] : ${transcriptionForChannels[index].channels[i]}`);
         }
+        console.log('\n');
       })
       .catch((err) => {
         console.error('ERROR:', err);
