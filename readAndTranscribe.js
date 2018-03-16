@@ -1,7 +1,49 @@
 const speech = require('@google-cloud/speech');
 const fs = require('fs');
 
+const VOICE_THRESHOLD = 100;
+
 let fd = -1;
+
+function getTranscription(startSec, audioBytes) {
+  const audio = {
+    content: audioBytes,
+  };
+  const config = {
+    encoding,
+    sampleRateHertz,
+    languageCode,
+  };
+  const request = {
+    audio,
+    config,
+  };
+
+  ((start) => {
+    client
+      .recognize(request)
+      .then(data => {
+        const response = data[0];
+        const transcription = response.results
+          .map(result => result.alternatives[0].transcript)
+          .join('\n');
+        console.log(`[${formatTime(start)}] : ${transcription}`);
+      })
+      .catch(err => {
+        console.error('ERROR:', err);
+      });
+  })(startSec);
+}
+
+function computeEnergy(buffer, index, length) {
+  let energy = 0;
+  for (let i = 0; i < length; i += 2) {
+    const val = buffer.readInt16LE(index + i);
+    energy += Math.abs(val);
+  }
+
+  return Math.round(energy/length);
+}
 
 function basename(path) {
   return path.replace(/.*\/|\.*$/g, '');
@@ -34,11 +76,18 @@ Usage: node ${basename(process.argv[1])} [options] [filename]
 Options:
   -l, --lang                 Transcription language code, e.g. : en-US, fr-FR.
                              Defaults to en-US.
-  -c, --chunkduration        The duration in seconds of audio buffer to submit
-                             to Google for transcription. Defaults to 10
-                             seconds, and must not exceed 60 seconds.
-  -d, --debug                debug mode
-  -h, --help                 This help message
+
+  -s, --silence              Frames with energy under this value will be considered
+                             to be silent. Defaults to 100 (purely arbitrary !).
+
+  -e, --eof                  The maximum number of tries to consider that the
+                             end of file (EOF) has been reached. Useful if you run
+                             this program to transcribe a file that is being
+                             continuously fed with new audio data. Defaults to 4.
+
+  -d, --debug                Run in debug mode.
+
+  -h, --help                 Show this help message.
 
 Requirements: You need a valid service account for a Google Cloud Platform
 project to run this program.
@@ -129,8 +178,8 @@ if (header.readUIntLE(20, 2) !== 1) {
 
 const channels = header.readUIntLE(22, 2);
 console.log('Channels :', channels);
-if (header.readUIntLE(22, 2) !== 1 && header.readUIntLE(22, 2) !== 2) {
-  console.log('Error: One channel (mono) or two channels (stereo) accepted');
+if (header.readUIntLE(22, 2) !== 1) {
+  console.log('Error: One channel (mono) accepted');
   fs.closeSync(fd);
   printHelpAndExit();
 }
@@ -151,136 +200,118 @@ if (bitsPerSample !== 16) {
 const encoding = `LINEAR${bitsPerSample}`;
 console.log('Encoding : ', encoding);
 
-const duration = argv.c || argv.chunkduration || 10;
-if (duration < 2 || duration > 60) {
-  console.log('Error: Invalid audio chunk duration');
-  fs.closeSync(fd);
-  printHelpAndExit();
-}
-
+// Get 200ms of data every 200ms
+const duration = 0.2;
 const sampleSize = bitsPerSample / 8;
-const chunkSize = duration * channels * sampleRateHertz * (bitsPerSample / 8);
+const chunkSize = duration * sampleRateHertz * (bitsPerSample / 8);
 const audioBuffer = Buffer.alloc(chunkSize);
-
-const audioBufferChannelsArray = [];
-for (let i = 0; i < channels; i += 1) {
-  audioBufferChannelsArray[i] = Buffer.alloc(chunkSize / channels);
-}
+const maxAudioDurationToSend = 10;
+const minAudioDurationToSend = 2;
+const maxAudioBufferToSendSize = maxAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8);
+const minAudioBufferToSendSize = minAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8);
+const audioBufferToSend = Buffer.alloc(maxAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8));
 
 let totalAudioBytesRead = 0;
-let relativeAudioBytesRead = 0;
+let audioBytesRead = 0;
 
 console.log('chunk size :', chunkSize, 'bytes, chunk duration :', duration, 'seconds');
 
 // Creates a client
 const client = new speech.SpeechClient();
 
-const transcriptionForChannels = [];
-let intervalCounter = 0;
 let emptyRead = 0;
+let silenceFramesNum = 0;
+let audioBufferOffset = 0;
+audioBufferToSend.fill(0);
 
 let timerId = setTimeout(function tick() {
   let audioBytesRead = 0;
 
-  if (relativeAudioBytesRead < chunkSize) {
-    // Need more data
-    debug && console.log('Buffer is not full, still filling it');
-    audioBytesRead = fs.readSync(
-      fd,
-      audioBuffer,
-      relativeAudioBytesRead,
-      chunkSize - relativeAudioBytesRead,
-    );
-    debug && console.log(`Read ${audioBytesRead} bytes of data`);
+  audioBytesRead = fs.readSync(fd, audioBuffer, 0, chunkSize);
 
-    if (audioBytesRead < 1) {
-      emptyRead += 1;
+  if (audioBytesRead < 1) {
+    emptyRead += 1;
 
-      if (emptyRead > 4) {
-        console.log('Read 0 bytes for too long, clearing timeout and leaving');
-        clearTimeout(timerId);
-        return;
-      }
-
-      debug && console.log('Read 0 bytes, still getting more data if any...');
-      timerId = setTimeout(tick, 2000);
+    if (emptyRead > 0) {
+      console.log('Read 0 bytes for too long, clearing timeout and leaving');
+      // Last transcription request to send
+      getTranscription(( totalAudioBytesRead - audioBufferOffset - audioBytesRead ) / (sampleSize * sampleRateHertz), audioBufferToSend.toString('base64'));
+      clearTimeout(timerId);
       return;
     }
 
-    emptyRead = 0;
-    relativeAudioBytesRead += audioBytesRead;
-    totalAudioBytesRead += audioBytesRead;
-    timerId = setTimeout(tick, 50);
+    debug && console.log('Read 0 bytes, still getting more data if any...');
+    timerId = setTimeout(tick, duration * 1000);
     return;
-  } else if (relativeAudioBytesRead >= chunkSize) {
-    debug && console.log('Buffer is full, starting with new data');
-    relativeAudioBytesRead = 0;
-    audioBytesRead = fs.readSync(fd, audioBuffer, 0, chunkSize);
   }
 
-  relativeAudioBytesRead += audioBytesRead;
+  emptyRead = 0;
   totalAudioBytesRead += audioBytesRead;
-  const timestampSec = totalAudioBytesRead / (sampleSize * channels * sampleRateHertz);
+
+  const timestampSec = totalAudioBytesRead / (sampleSize * sampleRateHertz);
   const timestamp = formatTime(timestampSec);
+  const startOfSpeechSec = ( totalAudioBytesRead - audioBufferOffset - audioBytesRead ) / (sampleSize * sampleRateHertz);
 
-  // Copy audio buffers for every channel
-  for (let i = 0; i < chunkSize; i += channels * (bitsPerSample / 8)) {
-    for (let j = 0; j < channels; j += 1) {
-      audioBuffer.copy(
-        audioBufferChannelsArray[j],
-        i / channels,
-        i + (j * channels),
-        i + (j * channels) + (bitsPerSample / 8),
-      );
+  let k = 0;
+  const step = Math.round(audioBuffer.length);
+  for (let j = 0; j < audioBuffer.length; j += step) {
+    const energy = computeEnergy(audioBuffer, j, step);
+    if (energy < VOICE_THRESHOLD) {
+      debug && console.log(`[${timestamp}] Energy : ${energy} (SILENCE)`);
+      silenceFramesNum += 1;
+    } else {
+      debug && console.log(`[${timestamp}] Energy : ${energy}`);
+      silenceFramesNum = 0;
     }
-  }
-
-  debug && console.log('audioBuffer : ', audioBuffer);
-  for (let i = 0; i < channels; i += 1) {
-    debug && console.log(`audioBufferChannels[${i}] : `, audioBufferChannelsArray[i]);
+    k += 1;
   }
 
   debug && console.log('Cursor is at ', timestamp, 'sec');
-  debug && console.log('Read', audioBytesRead / (sampleSize * channels * sampleRateHertz), 'seconds length of data');
+  debug && console.log('Read', audioBytesRead / (sampleSize * sampleRateHertz), 'seconds length of data');
+  debug && console.log('audioBufferOffset :', audioBufferOffset);
 
-  transcriptionForChannels[intervalCounter] = {};
-  transcriptionForChannels[intervalCounter].timestamp = timestamp;
-  transcriptionForChannels[intervalCounter].channels = new Array(channels);
+  /**
+   * Various conditions that trigger transcription to Google :
+   * - audio data extends maxAudioBufferToSendSize
+   * - audio data extends minAudioBufferToSendSize and got silence
+   */
+  if (audioBufferOffset + audioBytesRead > maxAudioBufferToSendSize) {
+    // Reached end of buffer
+    getTranscription(startOfSpeechSec, audioBufferToSend.toString('base64'));
+    audioBufferOffset = 0;
+    audioBufferToSend.fill(0);
+    debug && console.log('Reached end ob buffer, now resetting!!!!!');
+  } else if (silenceFramesNum > 4 && (audioBufferOffset + audioBytesRead) > minAudioBufferToSendSize) {
+    // Got silence and enough data in buffer
+    let silenceFramesNum = 0;
+    let framesNum = 0;
+    for (let j = 0; j < audioBufferOffset + audioBytesRead; j += step) {
+      const energy = computeEnergy(audioBufferToSend, j, step);
+      if (energy < VOICE_THRESHOLD) {
+        silenceFramesNum += 1;
+      }
 
-  const requestForChannelArray = [];
-  for (let i = 0; i < channels; i += 1) {
-    requestForChannelArray[i] = {
-      audio: {
-        content: audioBufferChannelsArray[i].toString('base64'),
-      },
-      config: {
-        encoding,
-        sampleRateHertz,
-        languageCode,
-      },
-    };
+      framesNum += 1;
+    }
+
+    const silencePct = Math.round((silenceFramesNum / framesNum) * 100);
+    debug && console.log(`Silence : ${Math.round((silenceFramesNum / framesNum) * 100)}%`);
+
+    // Ask for transcription if actual speech has been detected
+    if (silencePct < 90) {
+      getTranscription(startOfSpeechSec, audioBufferToSend.toString('base64'));
+      console.log('End of speech detected, asking for transcription, audioBufferOffset :', audioBufferOffset);
+    } else {
+      debug && console.log('No speech detected, won\'t ask Google to transcribe');
+    }
+
+    audioBufferOffset = 0;
+    audioBufferToSend.fill(0);
   }
 
-  ((index) => {
-    Promise
-      .all(requestForChannelArray.map(request => client.recognize(request)))
-      .then((arrayData) => {
-        for (let i = 0; i < channels; i += 1) {
-          const response = arrayData[i][0];
-          const transcription = response.results
-            .map(result => result.alternatives[0].transcript)
-            .join('\n');
-          transcriptionForChannels[index].channels[i] = transcription;
-          console.log(`[${transcriptionForChannels[index].timestamp} CHANNEL ${i}] : ${transcriptionForChannels[index].channels[i]}`);
-        }
-        console.log('\n');
-      })
-      .catch((err) => {
-        console.error('ERROR:', err);
-      });
-  })(intervalCounter);
+  audioBuffer.copy(audioBufferToSend, audioBufferOffset);
+  debug && console.log('audioBufferToSend : ', audioBufferToSend);
+  audioBufferOffset += audioBytesRead;
 
-  intervalCounter += 1;
-
-  timerId = setTimeout(tick, 2000);
-}, 2000);
+  timerId = setTimeout(tick, duration * 1000);
+}, duration * 1000);
