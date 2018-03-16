@@ -155,6 +155,8 @@ if (isNaN(silenceThreshold)) {
   silenceThreshold = 100;
 }
 
+const eofRetries = argv.e || argv.eof || 4;
+
 if (fs.readSync(fd, header, 0, 44) !== 44) {
   console.log('Error: Cannot read file.');
   closeAudioFileAndExit();
@@ -195,6 +197,7 @@ console.log('Sample rate :', sampleRateHertz);
 console.log('Bits per sample :', bitsPerSample);
 console.log('Bit rate :', bitRate, 'bits/s');
 console.log('Silence threshold :', silenceThreshold);
+console.log('EOF retries :', eofRetries);
 
 if (bitsPerSample !== 16) {
   console.log('Error: Invalid sample size', bitsPerSample);
@@ -236,7 +239,7 @@ let timerId = setTimeout(function tick() {
   if (audioBytesRead < 1) {
     emptyRead += 1;
 
-    if (emptyRead > 0) {
+    if (emptyRead > eofRetries) {
       console.log('Read 0 bytes for too long, clearing timeout and leaving');
       // Last transcription request to send
       getTranscription(( totalAudioBytesRead - audioBufferOffset - audioBytesRead ) / (sampleSize * sampleRateHertz), audioBufferToSend.toString('base64'));
