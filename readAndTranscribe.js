@@ -20,14 +20,14 @@ function getTranscription(startSec, audioBytes) {
   ((start) => {
     client
       .recognize(request)
-      .then(data => {
+      .then((data) => {
         const response = data[0];
         const transcription = response.results
           .map(result => result.alternatives[0].transcript)
           .join('\n');
         console.log(`[${formatTime(start)}] : ${transcription}`);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error('ERROR:', err);
       });
   })(startSec);
@@ -40,7 +40,7 @@ function computeEnergy(buffer, index, length) {
     energy += Math.abs(val);
   }
 
-  return Math.round(energy/length);
+  return Math.round(energy / length);
 }
 
 function basename(path) {
@@ -161,7 +161,7 @@ console.log('Transcription language : ', languageCode);
 const debug = argv.d || argv.debug || false;
 console.log('debug : ', debug);
 
-let silenceThreshold =  argv.s || argv.silence || 100;
+let silenceThreshold = argv.s || argv.silence || 100;
 if (isNaN(silenceThreshold)) {
   silenceThreshold = 100;
 }
@@ -240,7 +240,6 @@ const minAudioBufferToSendSize = minAudioDurationToSend * sampleRateHertz * (bit
 const audioBufferToSend = Buffer.alloc(maxAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8));
 
 let totalAudioBytesRead = 0;
-let audioBytesRead = 0;
 
 console.log('chunk size :', chunkSize, 'bytes, chunk duration :', duration, 'seconds');
 
@@ -263,7 +262,7 @@ let timerId = setTimeout(function tick() {
     if (emptyRead > eofRetries) {
       console.log('Read 0 bytes for too long, clearing timeout and leaving');
       // Last transcription request to send
-      getTranscription(( totalAudioBytesRead - audioBufferOffset - audioBytesRead ) / (sampleSize * sampleRateHertz), audioBufferToSend.toString('base64'));
+      getTranscription((totalAudioBytesRead - audioBufferOffset - audioBytesRead) / (sampleSize * sampleRateHertz), audioBufferToSend.toString('base64'));
       clearTimeout(timerId);
       return;
     }
@@ -278,7 +277,7 @@ let timerId = setTimeout(function tick() {
 
   const timestampSec = totalAudioBytesRead / (sampleSize * sampleRateHertz);
   const timestamp = formatTime(timestampSec);
-  const startOfSpeechSec = ( totalAudioBytesRead - audioBufferOffset - audioBytesRead ) / (sampleSize * sampleRateHertz);
+  const startOfSpeechSec = (totalAudioBytesRead - audioBufferOffset - audioBytesRead) / (sampleSize * sampleRateHertz);
 
   let k = 0;
   const step = Math.round(audioBuffer.length);
