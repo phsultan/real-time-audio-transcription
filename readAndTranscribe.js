@@ -1,8 +1,6 @@
 const speech = require('@google-cloud/speech');
 const fs = require('fs');
 
-const VOICE_THRESHOLD = 100;
-
 let fd = -1;
 
 function getTranscription(startSec, audioBytes) {
@@ -152,6 +150,11 @@ console.log('Transcription language : ', languageCode);
 const debug = argv.d || argv.debug || false;
 console.log('debug : ', debug);
 
+let silenceThreshold =  argv.s || argv.silence || 100;
+if (isNaN(silenceThreshold)) {
+  silenceThreshold = 100;
+}
+
 if (fs.readSync(fd, header, 0, 44) !== 44) {
   console.log('Error: Cannot read file.');
   closeAudioFileAndExit();
@@ -191,6 +194,7 @@ const bitRate = sampleRateHertz * bitsPerSample;
 console.log('Sample rate :', sampleRateHertz);
 console.log('Bits per sample :', bitsPerSample);
 console.log('Bit rate :', bitRate, 'bits/s');
+console.log('Silence threshold :', silenceThreshold);
 
 if (bitsPerSample !== 16) {
   console.log('Error: Invalid sample size', bitsPerSample);
@@ -256,7 +260,7 @@ let timerId = setTimeout(function tick() {
   const step = Math.round(audioBuffer.length);
   for (let j = 0; j < audioBuffer.length; j += step) {
     const energy = computeEnergy(audioBuffer, j, step);
-    if (energy < VOICE_THRESHOLD) {
+    if (energy < silenceThreshold) {
       debug && console.log(`[${timestamp}] Energy : ${energy} (SILENCE)`);
       silenceFramesNum += 1;
     } else {
@@ -287,7 +291,7 @@ let timerId = setTimeout(function tick() {
     let framesNum = 0;
     for (let j = 0; j < audioBufferOffset + audioBytesRead; j += step) {
       const energy = computeEnergy(audioBufferToSend, j, step);
-      if (energy < VOICE_THRESHOLD) {
+      if (energy < silenceThreshold) {
         silenceFramesNum += 1;
       }
 
