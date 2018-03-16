@@ -3,22 +3,30 @@ const fs = require('fs');
 
 let fd = -1;
 
-function getTranscription(startSec, audioBytes) {
+function formatTime(time) {
+  let hour = Math.floor(time / 3600);
+  let min = Math.floor(time / 60);
+  let sec = Math.floor(time - (min * 60));
+
+  hour < 10 ? hour = `0${hour}` : hour.toString();
+  min < 10 ? min = `0${min}` : min = min.toString();
+  sec < 10 ? sec = `0${sec}` : sec = sec.toString();
+
+  return `${hour}:${min}:${sec}`;
+}
+
+function getTranscription(startSec, audioBytes, googleConfig, googleSpeechClient) {
   const audio = {
     content: audioBytes,
   };
-  const config = {
-    encoding,
-    sampleRateHertz,
-    languageCode,
-  };
+
   const request = {
     audio,
-    config,
+    googleConfig,
   };
 
   ((start) => {
-    client
+    googleSpeechClient
       .recognize(request)
       .then((data) => {
         const response = data[0];
@@ -45,18 +53,6 @@ function computeEnergy(buffer, index, length) {
 
 function basename(path) {
   return path.replace(/.*\/|\.*$/g, '');
-}
-
-function formatTime(time) {
-  let hour = Math.floor(time / 3600);
-  let min = Math.floor(time / 60);
-  let sec = Math.floor(time - (min * 60));
-
-  hour < 10 ? hour = `0${hour}` : hour.toString();
-  min < 10 ? min = `0${min}` : min = min.toString();
-  sec < 10 ? sec = `0${sec}` : sec = sec.toString();
-
-  return `${hour}:${min}:${sec}`;
 }
 
 function closeAudioFileAndExit() {
@@ -162,19 +158,19 @@ const debug = argv.d || argv.debug || false;
 console.log('debug : ', debug);
 
 let silenceThreshold = argv.s || argv.silence || 100;
-if (isNaN(silenceThreshold)) {
+if (Number.isNaN(silenceThreshold)) {
   silenceThreshold = 100;
 }
 
 const eofRetries = argv.e || argv.eof || 4;
 
 let minAudioDurationToSend = argv.m || argv.minaudio || 2;
-if (isNaN(minAudioDurationToSend)) {
+if (Number.isNaN(minAudioDurationToSend)) {
   minAudioDurationToSend = 2;
 }
 
 let maxAudioDurationToSend = argv.M || argv.maxaudio || 10;
-if (isNaN(maxAudioDurationToSend)) {
+if (Number.isNaN(maxAudioDurationToSend)) {
   maxAudioDurationToSend = 10;
 }
 
@@ -237,7 +233,8 @@ const chunkSize = duration * sampleRateHertz * (bitsPerSample / 8);
 const audioBuffer = Buffer.alloc(chunkSize);
 const maxAudioBufferToSendSize = maxAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8);
 const minAudioBufferToSendSize = minAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8);
-const audioBufferToSend = Buffer.alloc(maxAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8));
+const audioBufferToSend =
+  Buffer.alloc(maxAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8));
 
 let totalAudioBytesRead = 0;
 
@@ -245,6 +242,11 @@ console.log('chunk size :', chunkSize, 'bytes, chunk duration :', duration, 'sec
 
 // Creates a client
 const client = new speech.SpeechClient();
+const config = {
+  encoding,
+  sampleRateHertz,
+  languageCode,
+};
 
 let emptyRead = 0;
 let silenceFramesNum = 0;
@@ -262,7 +264,7 @@ let timerId = setTimeout(function tick() {
     if (emptyRead > eofRetries) {
       console.log('Read 0 bytes for too long, clearing timeout and leaving');
       // Last transcription request to send
-      getTranscription((totalAudioBytesRead - audioBufferOffset - audioBytesRead) / (sampleSize * sampleRateHertz), audioBufferToSend.toString('base64'));
+      getTranscription((totalAudioBytesRead - audioBufferOffset - audioBytesRead) / (sampleSize * sampleRateHertz), audioBufferToSend.toString('base64'), config, client);
       clearTimeout(timerId);
       return;
     }
@@ -277,9 +279,9 @@ let timerId = setTimeout(function tick() {
 
   const timestampSec = totalAudioBytesRead / (sampleSize * sampleRateHertz);
   const timestamp = formatTime(timestampSec);
-  const startOfSpeechSec = (totalAudioBytesRead - audioBufferOffset - audioBytesRead) / (sampleSize * sampleRateHertz);
+  const startOfSpeechSec =
+    (totalAudioBytesRead - audioBufferOffset - audioBytesRead) / (sampleSize * sampleRateHertz);
 
-  let k = 0;
   const step = Math.round(audioBuffer.length);
   for (let j = 0; j < audioBuffer.length; j += step) {
     const energy = computeEnergy(audioBuffer, j, step);
@@ -290,7 +292,6 @@ let timerId = setTimeout(function tick() {
       debug && console.log(`[${timestamp}] Energy : ${energy}`);
       silenceFramesNum = 0;
     }
-    k += 1;
   }
 
   debug && console.log('Cursor is at ', timestamp, 'sec');
@@ -304,29 +305,30 @@ let timerId = setTimeout(function tick() {
    */
   if (audioBufferOffset + audioBytesRead > maxAudioBufferToSendSize) {
     // Reached end of buffer
-    getTranscription(startOfSpeechSec, audioBufferToSend.toString('base64'));
+    getTranscription(startOfSpeechSec, audioBufferToSend.toString('base64'), config, client);
     audioBufferOffset = 0;
     audioBufferToSend.fill(0);
     debug && console.log('Reached end ob buffer, now resetting!!!!!');
-  } else if (silenceFramesNum > 4 && (audioBufferOffset + audioBytesRead) > minAudioBufferToSendSize) {
+  } else if (silenceFramesNum > 4 &&
+    (audioBufferOffset + audioBytesRead) > minAudioBufferToSendSize) {
     // Got silence and enough data in buffer
-    let silenceFramesNum = 0;
+    let silenceFramesNumInBuffer = 0;
     let framesNum = 0;
     for (let j = 0; j < audioBufferOffset + audioBytesRead; j += step) {
       const energy = computeEnergy(audioBufferToSend, j, step);
       if (energy < silenceThreshold) {
-        silenceFramesNum += 1;
+        silenceFramesNumInBuffer += 1;
       }
 
       framesNum += 1;
     }
 
-    const silencePct = Math.round((silenceFramesNum / framesNum) * 100);
-    debug && console.log(`Silence : ${Math.round((silenceFramesNum / framesNum) * 100)}%`);
+    const silencePct = Math.round((silenceFramesNumInBuffer / framesNum) * 100);
+    debug && console.log(`Silence : ${Math.round((silenceFramesNumInBuffer / framesNum) * 100)}%`);
 
     // Ask for transcription if actual speech has been detected
     if (silencePct < 90) {
-      getTranscription(startOfSpeechSec, audioBufferToSend.toString('base64'));
+      getTranscription(startOfSpeechSec, audioBufferToSend.toString('base64'), config, client);
       console.log('End of speech detected, asking for transcription, audioBufferOffset :', audioBufferOffset);
     } else {
       debug && console.log('No speech detected, won\'t ask Google to transcribe');
