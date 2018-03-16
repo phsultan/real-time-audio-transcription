@@ -22,7 +22,7 @@ function getTranscription(startSec, audioBytes, googleConfig, googleSpeechClient
 
   const request = {
     audio,
-    googleConfig,
+    config: googleConfig,
   };
 
   ((start) => {
