@@ -40,9 +40,27 @@ Usage: node readAndTranscribe.js [options] [filename]
 Options:
   -l, --lang                 Transcription language code, e.g. : en-US, fr-FR.
                              Defaults to en-US.
-  -c, --chunkduration        The duration in seconds of audio buffer to submit
-                             to Google for transcription. Defaults to 10
-                             seconds, and must not exceed 60 seconds.
-  -d, --debug                debug mode
-  -h, --help                 This help message
+
+  -s, --silence              Frames with energy under this value will be considered
+                             to be silent. Defaults to 100 (purely arbitrary !).
+
+  -e, --eof                  The maximum number of tries to consider that the
+                             end of file (EOF) has been reached. Useful if you run
+                             this program to transcribe a file that is being
+                             continuously fed with new audio data. Defaults to 4.
+
+  -m, --minaudio             The minimum acceptable duration of speech to trigger
+                             a recognition request. More audio data will be collected
+                             if we're under this value before issuing a recognition
+                             request. Defaults to 2 seconds.
+
+  -M, --maxaudio             The maximum acceptable duration of speech to trigger
+                             a recognition request. If we don't detect any silence
+                             and the audio buffer is about to exceed this value,
+                             then we force a recognition request to Google.
+                             Defaults to 10 seconds.
+
+  -d, --debug                Run in debug mode.
+
+  -h, --help                 Show this help message.
 ```
