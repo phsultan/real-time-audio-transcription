@@ -83,6 +83,17 @@ Options:
                              this program to transcribe a file that is being
                              continuously fed with new audio data. Defaults to 4.
 
+  -m, --minaudio             The minimum acceptable duration of speech to trigger
+                             a recognition request. More audio data will be collected
+                             if we're under this value before issuing a recognition
+                             request. Defaults to 2 seconds.
+
+  -M, --maxaudio             The maximum acceptable duration of speech to trigger
+                             a recognition request. If we don't detect any silence
+                             and the audio buffer is about to exceed this value,
+                             then we force a recognition request to Google.
+                             Defaults to 10 seconds.
+
   -d, --debug                Run in debug mode.
 
   -h, --help                 Show this help message.
@@ -157,6 +168,16 @@ if (isNaN(silenceThreshold)) {
 
 const eofRetries = argv.e || argv.eof || 4;
 
+let minAudioDurationToSend = argv.m || argv.minaudio || 2;
+if (isNaN(minAudioDurationToSend)) {
+  minAudioDurationToSend = 2;
+}
+
+let maxAudioDurationToSend = argv.M || argv.maxaudio || 10;
+if (isNaN(maxAudioDurationToSend)) {
+  maxAudioDurationToSend = 10;
+}
+
 if (fs.readSync(fd, header, 0, 44) !== 44) {
   console.log('Error: Cannot read file.');
   closeAudioFileAndExit();
@@ -198,6 +219,8 @@ console.log('Bits per sample :', bitsPerSample);
 console.log('Bit rate :', bitRate, 'bits/s');
 console.log('Silence threshold :', silenceThreshold);
 console.log('EOF retries :', eofRetries);
+console.log('Minimum audio buffer length :', minAudioDurationToSend, 'seconds');
+console.log('Maximum audio buffer length :', maxAudioDurationToSend, 'seconds');
 
 if (bitsPerSample !== 16) {
   console.log('Error: Invalid sample size', bitsPerSample);
@@ -212,8 +235,6 @@ const duration = 0.2;
 const sampleSize = bitsPerSample / 8;
 const chunkSize = duration * sampleRateHertz * (bitsPerSample / 8);
 const audioBuffer = Buffer.alloc(chunkSize);
-const maxAudioDurationToSend = 10;
-const minAudioDurationToSend = 2;
 const maxAudioBufferToSendSize = maxAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8);
 const minAudioBufferToSendSize = minAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8);
 const audioBufferToSend = Buffer.alloc(maxAudioDurationToSend * sampleRateHertz * (bitsPerSample / 8));
