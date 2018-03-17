@@ -262,7 +262,7 @@ let timerId = setTimeout(function tick() {
     emptyRead += 1;
 
     if (emptyRead > eofRetries) {
-      console.log('Read 0 bytes for too long, clearing timeout and leaving');
+      debug && console.log('Read 0 bytes for too long, clearing timeout and leaving');
       // Last transcription request to send
       getTranscription((totalAudioBytesRead - audioBufferOffset - audioBytesRead) / (sampleSize * sampleRateHertz), audioBufferToSend.toString('base64'), config, client);
       clearTimeout(timerId);
