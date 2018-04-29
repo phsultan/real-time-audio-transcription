@@ -24,7 +24,7 @@
   },
   "homepage": "https://github.com/phsultan/real-time-audio-transcription#readme",
   "dependencies": {
-    "@google-cloud/speech": "^1.1.0",
+    "@google-cloud/speech": "~1.5.x",
     "minimist": "^1.2.0"
   },
   "devDependencies": {
