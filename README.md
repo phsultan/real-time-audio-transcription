@@ -1,7 +1,7 @@
 # real-time-audio-transcription
 Read wav audio files and get their audio chunks transcribed by Google Speech API in real time.
 
-This program takes an audio file as an input and uses Google Speech API to output a text transcription.
+This program takes an audio file as an input and uses Google Speech API to output a text transcription. The audio file is read in real time (bitrate is taken from the .wav header information), and synchronized transcription requests are made to Google's server over the `nodejs-speech` NPM package.
 
 # Requirements
 ## Node.js
