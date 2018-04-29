@@ -64,3 +64,15 @@ Options:
 
   -h, --help                 Show this help message.
 ```
+
+# Examples
+
+Read content from a local audio file `/tmp/audio-content.wav`, get a Spanish transcription :
+```
+$ node readAndTranscribe.js /tmp/audio-content.wav --lang=en-ES
+```
+
+Read content from a URL, transcribe with default options (US English transcription) :
+```
+$ curl -s -X GET 'http://mydomain.com/audio-content.wav' | node readAndTranscribe.js
+```
